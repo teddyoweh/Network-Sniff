@@ -1,64 +1,36 @@
-from scapy.all import *
-from threading import Thread
-import pandas
-import time
-import os
-import sys
+#!/usr/bin/env python3
+# Import scapy
+import scapy.all as scapy
+# We need to create regular expressions to ensure that the input is correctly formatted.
+import re
+
+# Basic user interface header
+print("""______            _     _  ______                 _           _ 
+|  _  \          (_)   | | | ___ \               | |         | |
+| | | |__ ___   ___  __| | | |_/ / ___  _ __ ___ | |__   __ _| |
+| | | / _` \ \ / / |/ _` | | ___ \/ _ \| '_ ` _ \| '_ \ / _` | |
+| |/ / (_| |\ V /| | (_| | | |_/ / (_) | | | | | | |_) | (_| | |
+|___/ \__,_| \_/ |_|\__,_| \____/ \___/|_| |_| |_|_.__/ \__,_|_|""")
+print("\n****************************************************************")
+print("\n* Copyright of David Bombal, 2021                              *")
+print("\n* https://www.davidbombal.com                                  *")
+print("\n* https://www.youtube.com/davidbombal                          *")
+print("\n****************************************************************")
+
+# Regular Expression Pattern to recognise IPv4 addresses.
+ip_add_range_pattern = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]*$")
+
+# Get the address range to ARP
+while True:
+    ip_add_range_entered = input("\nPlease enter the ip address and range that you want to send the ARP request to (ex 192.168.1.0/24): ")
+    if ip_add_range_pattern.search(ip_add_range_entered):
+        print(f"{ip_add_range_entered} is a valid ip address range")
+        break
 
 
-# initialize the networks dataframe that will contain all access points nearby
-networks = pandas.DataFrame(columns=["BSSID", "SSID", "dBm_Signal", "Channel", "Crypto"])
-# set the index BSSID (MAC address of the AP)
-networks.set_index("BSSID", inplace=True)
-
-def callback(packet):
-    if packet.haslayer(Dot11Beacon):
-        # extract the MAC address of the network
-        bssid = packet[Dot11].addr2
-        # get the name of it
-        ssid = packet[Dot11Elt].info.decode()
-        try:
-            dbm_signal = packet.dBm_AntSignal
-        except:
-            dbm_signal = "N/A"
-        # extract network stats
-        stats = packet[Dot11Beacon].network_stats()
-        # get the channel of the AP
-        channel = stats.get("channel")
-        # get the crypto
-        crypto = stats.get("crypto")
-        # add the network to our dataframe
-        networks.loc[bssid] = (ssid, dbm_signal, channel, crypto)
-
-
-def print_all():
-    # print all the networks and clear the console every 0.5s
-    while True:
-        os.system("clear")
-        print(networks)
-        time.sleep(0.5)
-
-
-def change_channel():
-    ch = 1
-    while True:
-        # change the channel of the interface
-        os.system(f"iwconfig {interface} channel {ch}")
-        # switch channel from 1 to 14 each 0.5s
-        ch = ch % 14 + 1
-        time.sleep(0.5)
-
-
-if __name__ == "__main__":
-    # interface name, check using iwconfig
-    interface = sys.argv[1]
-    # start the thread that prints all the networks
-    printer = Thread(target=print_all)
-    printer.daemon = True
-    printer.start()
-    # start the channel changer
-    channel_changer = Thread(target=change_channel)
-    channel_changer.daemon = True
-    channel_changer.start()
-    # start sniffing
-    sniff(prn=callback, iface=interface)
+# Try ARPing the ip address range supplied by the user. 
+# The arping() method in scapy creates a pakcet with an ARP message 
+# and sends it to the broadcast mac address ff:ff:ff:ff:ff:ff.
+# If a valid ip address range was supplied the program will return 
+# the list of all results.
+arp_result = scapy.arping(ip_add_range_entered)
